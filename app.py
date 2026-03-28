@@ -12,6 +12,8 @@ load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+os.makedirs("uploads", exist_ok=True)
+
 def search_jobs(job_role):
     url = "https://jsearch.p.rapidapi.com/search"
     headers = {
