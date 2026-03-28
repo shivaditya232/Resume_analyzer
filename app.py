@@ -37,7 +37,7 @@ def search_jobs(job_role):
     return jobs
 
 st.set_page_config(page_title="Resume Analyser", page_icon="📄")
-st.title("📄 Resume Analyser")
+st.title("Resume Analyser")
 st.write("Upload your resume and get instant analysis!")
 
 uploaded_file = st.file_uploader("Upload your Resume (PDF only)", type=["pdf"])
@@ -78,10 +78,10 @@ if uploaded_file is not None:
                 st.session_state.vectorstore = vectorstore
 
     if st.session_state.resume_text.strip():
-        st.success("✅ Resume uploaded and processed successfully!")
+        st.success("Resume uploaded and processed successfully!")
 
         if st.session_state.analysis is None:
-            if st.button("🔍 Analyse Resume"):
+            if st.button("Analyse Resume"):
                 with st.spinner("Analysing your resume with Gemini..."):
                     prompt = f"""
                     Analyse this resume and provide the following in a clean format:
@@ -116,17 +116,19 @@ if uploaded_file is not None:
                     st.session_state.job_role = job_role
 
         if st.session_state.analysis:
-            st.subheader("📊 Resume Analysis")
+            st.subheader("Resume Analysis")
             st.write(st.session_state.analysis)
 
             if st.session_state.jobs:
-                st.subheader(f"💼 Live Job Listings for: {st.session_state.job_role}")
+                st.subheader(f"Live Job Listings for: {st.session_state.job_role}")
                 for job in st.session_state.jobs:
                     st.markdown(f"""
                     **{job['title']}** at **{job['company']}**
-                    📍 {job['location']}
-                    🔗 [Apply Here]({job['link']})
+                    {job['location']}
+                    [Apply Here]({job['link']})
                     ---
                     """)
             else:
-                st.info("No
+                st.info("No job listings found. Try again later.")
+    else:
+        st.error("Could not extract text. Please upload a text-based PDF.")
