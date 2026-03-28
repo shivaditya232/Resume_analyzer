@@ -1,6 +1,7 @@
 import streamlit as st
 import fitz
 import os
+import re
 import requests
 import plotly.graph_objects as go
 from dotenv import load_dotenv
@@ -63,8 +64,6 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         color: #000000 !important;
     }
-    .job-card b { color: #000000 !important; }
-    .job-card a { color: #4CAF50 !important; }
     .gap-card {
         background-color: #fff3cd;
         padding: 10px 15px;
@@ -73,12 +72,13 @@ st.markdown("""
         border-left: 4px solid #ffc107;
         color: #000000 !important;
     }
-    .score-card {
-        background-color: white;
+    .tip-card {
+        background-color: #ffffff;
         padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        margin-bottom: 15px;
+        border-left: 5px solid #4CAF50;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -95,10 +95,10 @@ if uploaded_file is not None:
         st.session_state.vectorstore = None
         st.session_state.jobs = None
         st.session_state.score = None
-        st.session_state.skills = None
-        st.session_state.soft_skills = None
-        st.session_state.job_roles = None
-        st.session_state.gaps = None
+        st.session_state.skills = []
+        st.session_state.soft_skills = []
+        st.session_state.job_roles = []
+        st.session_state.gaps = []
         st.session_state.match_percentages = {}
 
         with open("uploads/temp_resume.pdf", "wb") as f:
@@ -310,8 +310,8 @@ if uploaded_file is not None:
                 if st.session_state.jobs:
                     for job in st.session_state.jobs:
                         st.markdown(f"""<div class='job-card'>
-<span style='font-size:16px; font-weight:bold; color:#000000;'>{job['title']}</span> 
-<span style='color:#555555;'>at</span> 
+<span style='font-size:16px; font-weight:bold; color:#000000;'>{job['title']}</span>
+<span style='color:#555555;'> at </span>
 <span style='font-weight:bold; color:#000000;'>{job['company']}</span><br>
 <span style='color:#555555;'>📍 {job['location']}</span><br>
 <a href='{job['link']}' target='_blank' style='color:#4CAF50; font-weight:bold;'>Apply Here →</a>
@@ -320,16 +320,27 @@ if uploaded_file is not None:
             with tab4:
                 st.subheader("Improvement Tips")
                 in_tips = False
-                tips_text = ""
+                current_tip = ""
                 for line in st.session_state.analysis.split("\n"):
                     if line.startswith("IMPROVEMENT_TIPS:"):
                         in_tips = True
-                        tips_text += line.replace("IMPROVEMENT_TIPS:", "").strip() + "\n"
+                        current_tip += line.replace("IMPROVEMENT_TIPS:", "").strip() + " "
                     elif in_tips and line.strip():
-                        tips_text += line.strip() + "\n"
-                if tips_text.strip():
-                    st.write(tips_text)
+                        current_tip += line.strip() + " "
+
+                tips = re.split(r'\d+\.', current_tip)
+                tips = [t.strip() for t in tips if t.strip()]
+
+                icons = ["💡", "📝", "🚀"]
+                titles = ["Tip 1", "Tip 2", "Tip 3"]
+
+                if tips:
+                    for i, tip in enumerate(tips[:3]):
+                        st.markdown(f"""<div class='tip-card'>
+<h4 style='color:#4CAF50; margin:0 0 8px 0;'>{icons[i] if i < len(icons) else "💡"} {titles[i] if i < len(titles) else f"Tip {i+1}"}</h4>
+<p style='color:#000000; margin:0; font-size:15px; line-height:1.6;'>{tip}</p>
+</div>""", unsafe_allow_html=True)
                 else:
-                    st.write(st.session_state.analysis)
+                    st.write(current_tip)
     else:
         st.error("Could not extract text. Please upload a text-based PDF.")
