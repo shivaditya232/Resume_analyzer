@@ -55,12 +55,23 @@ st.markdown("""
     }
     .stButton>button:hover { background-color: #45a049; }
     .job-card {
-        background-color: white;
+        background-color: #ffffff;
         padding: 15px;
         border-radius: 10px;
         margin-bottom: 10px;
         border-left: 4px solid #4CAF50;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        color: #000000 !important;
+    }
+    .job-card b { color: #000000 !important; }
+    .job-card a { color: #4CAF50 !important; }
+    .gap-card {
+        background-color: #fff3cd;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border-left: 4px solid #ffc107;
+        color: #000000 !important;
     }
     .score-card {
         background-color: white;
@@ -69,15 +80,6 @@ st.markdown("""
         text-align: center;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .metric-card {
-        background-color: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 10px;
-    }
-    h1 { color: #2c3e50; }
-    .stSuccess { border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,8 +96,10 @@ if uploaded_file is not None:
         st.session_state.jobs = None
         st.session_state.score = None
         st.session_state.skills = None
+        st.session_state.soft_skills = None
         st.session_state.job_roles = None
         st.session_state.gaps = None
+        st.session_state.match_percentages = {}
 
         with open("uploads/temp_resume.pdf", "wb") as f:
             f.write(uploaded_file.read())
@@ -132,23 +136,16 @@ if uploaded_file is not None:
             if st.button("Analyse Resume"):
                 with st.spinner("Analysing your resume with Gemini AI..."):
                     prompt = f"""
-                    Analyse this resume and provide the following in exact format:
+                    Analyse this resume and provide output in EXACTLY this format, each on its own line:
 
-                    RESUME_SCORE: (give a score out of 100 based on completeness, skills, experience)
-
-                    SKILLS: (comma separated list of all technical skills found)
-
-                    SOFT_SKILLS: (comma separated list of soft skills)
-
-                    EXPERIENCE_SUMMARY: (2-3 sentence summary)
-
-                    SUITABLE_JOB_ROLES: (exactly 5 job roles comma separated on one line)
-
-                    MATCH_PERCENTAGES: (for each role give percentage like: Role1:85, Role2:78, Role3:72, Role4:65, Role5:60)
-
-                    SKILLS_GAP: (list 3 missing skills that would help this candidate)
-
-                    IMPROVEMENT_TIPS: (exactly 3 tips numbered 1. 2. 3.)
+                    RESUME_SCORE: (number out of 100 only)
+                    SKILLS: (comma separated technical skills)
+                    SOFT_SKILLS: (comma separated soft skills)
+                    EXPERIENCE_SUMMARY: (2-3 sentences)
+                    SUITABLE_JOB_ROLES: (exactly 5 roles comma separated)
+                    MATCH_PERCENTAGES: Role1:85, Role2:78, Role3:72, Role4:65, Role5:60
+                    SKILLS_GAP: skill1, skill2, skill3
+                    IMPROVEMENT_TIPS: 1. tip one. 2. tip two. 3. tip three.
 
                     Resume:
                     {st.session_state.resume_text}
@@ -161,7 +158,6 @@ if uploaded_file is not None:
                     st.session_state.analysis = response.text
 
                     lines = response.text.split("\n")
-
                     score = 75
                     skills = []
                     soft_skills = []
@@ -171,9 +167,13 @@ if uploaded_file is not None:
 
                     for line in lines:
                         line = line.strip()
+                        if not line:
+                            continue
+
                         if line.startswith("RESUME_SCORE:"):
                             try:
-                                score = int(''.join(filter(str.isdigit, line.split(":")[1][:3])))
+                                val = line.split(":")[1].strip()
+                                score = int(''.join(filter(str.isdigit, val[:3])))
                             except:
                                 score = 75
 
@@ -208,9 +208,7 @@ if uploaded_file is not None:
                     st.session_state.job_roles = job_roles
                     st.session_state.match_percentages = match_percentages
                     st.session_state.gaps = gaps
-
-                    job_role = job_roles[0] if job_roles else "Software Developer"
-                    st.session_state.job_role = job_role
+                    st.session_state.job_role = job_roles[0] if job_roles else "Software Developer"
 
                 with st.spinner("Finding live job listings..."):
                     st.session_state.jobs = search_jobs(st.session_state.job_role)
@@ -222,7 +220,6 @@ if uploaded_file is not None:
                 col1, col2 = st.columns([1, 2])
 
                 with col1:
-                    st.markdown("<div class='score-card'>", unsafe_allow_html=True)
                     fig = go.Figure(go.Indicator(
                         mode="gauge+number",
                         value=st.session_state.score,
@@ -239,7 +236,6 @@ if uploaded_file is not None:
                     ))
                     fig.update_layout(height=250, margin=dict(t=30, b=0, l=20, r=20))
                     st.plotly_chart(fig, use_container_width=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
 
                 with col2:
                     st.subheader("Experience Summary")
@@ -251,7 +247,9 @@ if uploaded_file is not None:
                     st.subheader("Skills Gap")
                     if st.session_state.gaps:
                         for gap in st.session_state.gaps:
-                            st.markdown(f"❌ **{gap}**")
+                            st.markdown(f"<div class='gap-card'>❌ <b>{gap}</b></div>", unsafe_allow_html=True)
+                    else:
+                        st.info("No major skill gaps found!")
 
             with tab2:
                 col1, col2 = st.columns(2)
@@ -311,13 +309,13 @@ if uploaded_file is not None:
                 st.subheader(f"Live Job Listings for: {st.session_state.job_role}")
                 if st.session_state.jobs:
                     for job in st.session_state.jobs:
-                        st.markdown(f"""
-<div class='job-card'>
-<b>{job['title']}</b> at <b>{job['company']}</b><br>
-📍 {job['location']}<br>
-<a href='{job['link']}' target='_blank'>Apply Here</a>
-</div>
-""", unsafe_allow_html=True)
+                        st.markdown(f"""<div class='job-card'>
+<span style='font-size:16px; font-weight:bold; color:#000000;'>{job['title']}</span> 
+<span style='color:#555555;'>at</span> 
+<span style='font-weight:bold; color:#000000;'>{job['company']}</span><br>
+<span style='color:#555555;'>📍 {job['location']}</span><br>
+<a href='{job['link']}' target='_blank' style='color:#4CAF50; font-weight:bold;'>Apply Here →</a>
+</div>""", unsafe_allow_html=True)
 
             with tab4:
                 st.subheader("Improvement Tips")
@@ -329,8 +327,7 @@ if uploaded_file is not None:
                         tips_text += line.replace("IMPROVEMENT_TIPS:", "").strip() + "\n"
                     elif in_tips and line.strip():
                         tips_text += line.strip() + "\n"
-
-                if tips_text:
+                if tips_text.strip():
                     st.write(tips_text)
                 else:
                     st.write(st.session_state.analysis)
