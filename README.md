@@ -1,4 +1,4 @@
-🚀 Resume Analyzer
+##🚀 Resume Analyzer
 
 ## ✨ Features
  - 📄 Extracts skills, education, and experience from resumes 
