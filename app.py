@@ -2,6 +2,7 @@ import streamlit as st
 import fitz
 import os
 import re
+import time
 import numpy as np
 import plotly.graph_objects as go
 from dotenv import load_dotenv
@@ -47,14 +48,19 @@ def build_vectorstore(text: str) -> FAISS:
 
 @st.cache_data(show_spinner=False)
 def embed_text_cached(text: str) -> list:
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        google_api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    return embeddings.embed_query(text)
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+        )
+        return embeddings.embed_query(text)
+    except Exception:
+        return []
 
 
 def cosine_similarity(a: list, b: list) -> float:
+    if not a or not b:
+        return 0.0
     a, b = np.array(a), np.array(b)
     denom = np.linalg.norm(a) * np.linalg.norm(b)
     return float(np.dot(a, b) / denom) if denom else 0.0
@@ -69,11 +75,25 @@ def retrieve_context(vectorstore: FAISS, query: str, k: int = 4) -> str:
 
 
 def gemini_generate(prompt: str, model: str = "gemini-2.0-flash") -> str:
-    try:
-        response = client.models.generate_content(model=model, contents=prompt)
-        return response.text.strip()
-    except Exception as e:
-        return f"⚠️ Could not get a response. Please try again. ({str(e)})"
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(model=model, contents=prompt)
+            return response.text.strip()
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                if attempt < 2:
+                    wait = 35 * (attempt + 1)
+                    st.toast(f"Rate limit hit — retrying in {wait}s...", icon="⏳")
+                    time.sleep(wait)
+                else:
+                    return (
+                        "⚠️ Rate limit reached. Please wait a minute and try again. "
+                        "If this keeps happening, enable billing on Google AI Studio."
+                    )
+            else:
+                return f"⚠️ Could not get a response. Please try again. ({err})"
+    return "⚠️ Failed after 3 attempts. Please wait a moment and try again."
 
 
 def chat_with_resume(
@@ -380,10 +400,8 @@ if page == "JD Gap Analyser":
             st.error("Please paste a job description.")
             st.stop()
 
-        with st.spinner("Analysing with Gemini…"):
-            result = analyse_gap_cached(
-                st.session_state.resume_text, jd_text
-            )
+        with st.spinner("Analysing with Gemini… this may take up to 30 seconds"):
+            result = analyse_gap_cached(st.session_state.resume_text, jd_text)
             st.session_state.gap_result = result
 
         with st.spinner("Computing semantic similarity…"):
