@@ -134,7 +134,7 @@ USER: {user_message}
 
 Answer (specific, helpful, reference resume where relevant):"""
 
-        return gemini_generate(prompt, model="gemini-2.0-flash")
+        return gemini_generate(prompt, model="gemini-2.5-flash")
 
     except Exception as e:
         return f"⚠️ Something went wrong. Please try again. ({str(e)})"
