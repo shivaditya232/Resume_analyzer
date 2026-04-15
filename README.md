@@ -1,8 +1,8 @@
 ## 🚀 Resume Analyzer
 AI-powered resume analyzer that extracts skills, predicts job roles, analyzes skill gaps, and fetches live job listings using Gemini AI, LangChain, FAISS, and JSearch API.
 
-## Live Demo
-[Click here to try the app](https://resumeanalyzer-3bvybappzj8hpeupg7jedjj.streamlit.app/)
+## 🌐 Live Demo
+🔗[Click here](https://resumeanalyzer-3bvybappzj8hpeupg7jedjj.streamlit.app/)
 
 ## ✨ Features
  - 📄 Extracts skills, education, and experience from resumes 
