@@ -13,8 +13,43 @@ from langchain_community.vectorstores import FAISS
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=GEMINI_API_KEY)
 os.makedirs("uploads", exist_ok=True)
+
+# ── core Gemini call with full retry logic ────────────────────────────────────
+
+def gemini_generate(prompt: str, model: str = "gemini-2.5-flash") -> str:
+    for attempt in range(4):
+        try:
+            response = client.models.generate_content(model=model, contents=prompt)
+            return response.text.strip()
+        except Exception as e:
+            err = str(e)
+            # rate limit or quota exhausted
+            if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                if attempt < 3:
+                    wait = 40 * (attempt + 1)
+                    st.toast(f"Rate limit — retrying in {wait}s ({attempt+1}/3)...", icon="⏳")
+                    time.sleep(wait)
+                else:
+                    return (
+                        "⚠️ Daily quota exhausted. Please enable billing at "
+                        "aistudio.google.com or try again tomorrow."
+                    )
+            # server overloaded
+            elif "503" in err or "UNAVAILABLE" in err:
+                if attempt < 3:
+                    wait = 20 * (attempt + 1)
+                    st.toast(f"Server busy — retrying in {wait}s ({attempt+1}/3)...", icon="🔄")
+                    time.sleep(wait)
+                else:
+                    return "⚠️ Gemini servers are overloaded right now. Please try again in a few minutes."
+            # any other error
+            else:
+                return f"⚠️ Unexpected error. Please try again. ({err})"
+    return "⚠️ Failed after multiple retries. Please wait a moment and try again."
+
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,25 +72,40 @@ def extract_pdf_text(file_bytes: bytes) -> str:
 
 @st.cache_resource(show_spinner=False)
 def build_vectorstore(text: str) -> FAISS:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
-    chunks = splitter.create_documents([text])
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        google_api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    return FAISS.from_documents(chunks, embeddings)
+    for attempt in range(3):
+        try:
+            splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
+            chunks = splitter.create_documents([text])
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/gemini-embedding-001",
+                google_api_key=GEMINI_API_KEY,
+            )
+            return FAISS.from_documents(chunks, embeddings)
+        except Exception as e:
+            err = str(e)
+            if attempt < 2:
+                wait = 30 * (attempt + 1)
+                time.sleep(wait)
+            else:
+                st.error(f"Could not build knowledge base: {err}. Please re-upload your resume.")
+                return None
 
 
 @st.cache_data(show_spinner=False)
 def embed_text_cached(text: str) -> list:
-    try:
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-        )
-        return embeddings.embed_query(text)
-    except Exception:
-        return []
+    for attempt in range(3):
+        try:
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/gemini-embedding-001",
+                google_api_key=GEMINI_API_KEY,
+            )
+            return embeddings.embed_query(text)
+        except Exception:
+            if attempt < 2:
+                time.sleep(20 * (attempt + 1))
+            else:
+                return []
+    return []
 
 
 def cosine_similarity(a: list, b: list) -> float:
@@ -74,28 +124,6 @@ def retrieve_context(vectorstore: FAISS, query: str, k: int = 4) -> str:
         return ""
 
 
-def gemini_generate(prompt: str, model: str = "gemini-2.0-flash") -> str:
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(model=model, contents=prompt)
-            return response.text.strip()
-        except Exception as e:
-            err = str(e)
-            if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                if attempt < 2:
-                    wait = 35 * (attempt + 1)
-                    st.toast(f"Rate limit hit — retrying in {wait}s...", icon="⏳")
-                    time.sleep(wait)
-                else:
-                    return (
-                        "⚠️ Rate limit reached. Please wait a minute and try again. "
-                        "If this keeps happening, enable billing on Google AI Studio."
-                    )
-            else:
-                return f"⚠️ Could not get a response. Please try again. ({err})"
-    return "⚠️ Failed after 3 attempts. Please wait a moment and try again."
-
-
 def chat_with_resume(
     vectorstore: FAISS,
     resume_text: str,
@@ -104,7 +132,6 @@ def chat_with_resume(
 ) -> str:
     try:
         context = retrieve_context(vectorstore, user_message, k=4)
-
         history_text = ""
         for msg in chat_history[-10:]:
             role = "User" if msg["role"] == "user" else "Assistant"
@@ -310,13 +337,60 @@ st.markdown("""
         border-radius: 8px; padding: 10px 14px;
         color: #3B6D11; font-size: 13px; margin-top: 8px;
     }
+    .api-status-ok {
+        background: #EAF3DE; border: 1px solid #97C459;
+        border-radius: 8px; padding: 8px 12px;
+        color: #3B6D11; font-size: 12px; margin-top: 8px;
+    }
+    .api-status-fail {
+        background: #FCEBEB; border: 1px solid #F09595;
+        border-radius: 8px; padding: 8px 12px;
+        color: #A32D2D; font-size: 12px; margin-top: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ── sidebar — shared resume upload ────────────────────────────────────────────
+
+# ── API warmup check ──────────────────────────────────────────────────────────
+
+if "api_status" not in st.session_state:
+    try:
+        test = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents="Reply with the word OK only."
+        )
+        st.session_state.api_status = "ok"
+    except Exception as e:
+        err = str(e)
+        if "429" in err or "RESOURCE_EXHAUSTED" in err:
+            st.session_state.api_status = "quota"
+        elif "503" in err or "UNAVAILABLE" in err:
+            st.session_state.api_status = "busy"
+        else:
+            st.session_state.api_status = f"error: {err[:80]}"
+
+
+# ── sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.title("📄 Resume Suite")
+    st.markdown("---")
+
+    # API status indicator
+    status = st.session_state.get("api_status", "checking")
+    if status == "ok":
+        st.markdown("<div class='api-status-ok'>✅ Gemini API connected</div>", unsafe_allow_html=True)
+    elif status == "quota":
+        st.markdown("<div class='api-status-fail'>⚠️ Quota exhausted — enable billing or wait 24hrs</div>", unsafe_allow_html=True)
+    elif status == "busy":
+        st.markdown("<div class='api-status-fail'>⚠️ Gemini servers busy — try again in 5 mins</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='api-status-fail'>⚠️ API issue: {status}</div>", unsafe_allow_html=True)
+
+    if st.button("Recheck API", use_container_width=False):
+        del st.session_state["api_status"]
+        st.rerun()
+
     st.markdown("---")
     st.subheader("Step 1 — Upload Resume")
 
@@ -342,13 +416,17 @@ with st.sidebar:
 
             if text.strip():
                 with st.spinner("Building knowledge base..."):
-                    st.session_state.vectorstore = build_vectorstore(text)
-                st.markdown(
-                    "<div class='resume-ready'>✅ Resume ready! Switch to any tool below.</div>",
-                    unsafe_allow_html=True,
-                )
+                    vs = build_vectorstore(text)
+                    if vs:
+                        st.session_state.vectorstore = vs
+                        st.markdown(
+                            "<div class='resume-ready'>✅ Resume ready!</div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.error("Failed to build knowledge base. Please try again.")
             else:
-                st.error("Could not read text. Please use a text-based PDF.")
+                st.error("Could not read text. Use a text-based PDF.")
 
     if st.session_state.get("resume_text", "").strip() and not sidebar_resume:
         st.markdown(
@@ -383,6 +461,10 @@ if page == "JD Gap Analyser":
 
     if not st.session_state.get("resume_text", "").strip():
         st.warning("Upload your resume in the sidebar first.")
+        st.stop()
+
+    if st.session_state.get("api_status") != "ok":
+        st.error("API is not available right now. Check the status in the sidebar.")
         st.stop()
 
     jd_text = st.text_area(
@@ -514,10 +596,13 @@ elif page == "Resume Chatbot":
         st.warning("Upload your resume in the sidebar first to enable the chatbot.")
         st.stop()
 
+    if st.session_state.get("api_status") != "ok":
+        st.error("API is not available right now. Check the status in the sidebar.")
+        st.stop()
+
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # suggested questions
     st.markdown("**Try asking:**")
     suggestions = [
         "What are my strongest technical skills?",
@@ -549,7 +634,6 @@ elif page == "Resume Chatbot":
 
     st.markdown("---")
 
-    # chat history display
     if st.session_state.chat_history:
         for msg in st.session_state.chat_history:
             if msg["role"] == "user":
@@ -569,7 +653,6 @@ elif page == "Resume Chatbot":
 
     st.markdown("---")
 
-    # chat input
     with st.form(key="chat_form", clear_on_submit=True):
         col1, col2 = st.columns([5, 1])
         with col1:
