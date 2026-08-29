@@ -1,6 +1,0 @@
-id,field,n_skills_removed,skills_removed,tfidf_base,tfidf_ablated,tfidf_drop,embedding_base,embedding_ablated,embedding_drop,llm_base,llm_ablated,llm_drop,llm_detected_removed_skill
-P03001_Business_Analyst_match,Business Analyst,6,business analyst; requirements; uml; use case; use cases; brd,41.5,37.6,3.9,71.8,70.0,1.8,82.0,78,4.0,0
-P06001_Business_Intelligence_Business_Object_match,"Business Intelligence, Business Object",3,business intelligence; obiee; tableau,28.3,28.8,-0.5,70.3,68.3,2.0,40.0,18,22.0,1
-P05001_Datawarehousing_ETL_Informatica_match,"Datawarehousing, ETL, Informatica",4,informatica; etl; teradata; mappings,39.2,30.6,8.6,74.0,72.1,1.9,80.0,80,0.0,0
-P00001_Java_Developers-Architects_match,Java Developers/Architects,10,java; j2ee; jee; servlets; jsp; ejb; jdbc; hibernate; spring; struts,37.6,30.4,7.2,76.7,75.0,1.7,90.0,85,5.0,1
-P04001_Network_and_Systems_Administrators_match,Network and Systems Administrators,8,network; cisco; firewall; tcp/ip; router; routers; switches; dns,30.6,21.4,9.2,64.9,64.5,0.4,60.0,65,-5.0,1

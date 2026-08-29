@@ -8,13 +8,5 @@ __pycache__/
 *.bak_*
 *.oldbak
 
-# Large raw datasets — download separately (see research_eval/README.md)
+# Large raw dataset — download separately (see research_eval/README.md)
 research_eval/Resume dataset.csv
-research_eval/fit_dataset.csv
-
-# Superseded experiment artifacts kept locally, not tracked
-research_eval/charts_test/
-research_eval/charts_v1_2500trunc_backup/
-research_eval/charts_v2_categorylabel_backup/
-research_eval/results_v1_2500trunc_backup.csv
-research_eval/results_v2_categorylabel_backup.csv
