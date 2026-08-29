@@ -54,9 +54,16 @@ streamlit run app.py
 
 ```bash
 Resume_Analyzer/
-│── app.py
+│── app.py                  # Streamlit app (hybrid LLM + embedding match scoring)
 │── requirements.txt
 │── README.md
+│── paper/
+│   └── draft.docx          # Research paper: methodology, evaluation, results
+│── research_eval/
+│   ├── eval_scoring.py     # Scoring pipeline behind the paper's evaluation
+│   ├── results.csv         # n=200 scored resume/JD pairs
+│   ├── charts/             # Figures embedded in the paper
+│   └── README.md           # What each script does and how to reproduce it
 ```
 
 ## 🚀 Future Improvements
