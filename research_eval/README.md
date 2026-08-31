@@ -18,20 +18,28 @@ section describes what those attempts were and why they didn't ship.
 - `eval_scoring.py` — scores every pair with TF-IDF, embedding, and the LLM;
   resumable (append-only), since the LLM call is rate-limited. Produces
   `results.csv`.
+- `build_fig2_discrimination.py` — builds Fig. 2 (self-calibrated
+  classification accuracy: TF-IDF, embedding, LLM, and the hybrid fusion
+  score, each thresholded at its own average-based midpoint) from
+  `results.csv`.
+- `build_fig3_synonym.py` — builds Fig. 3 (match-score stability under
+  skill-terminology rewording, all four methods, small-multiples) from
+  `synonym_results.csv`.
 - `build_fig4_hybrid.py` — builds Fig. 4 (classification metrics: TF-IDF,
   embedding, LLM, and the cross-validated hybrid) from `results.csv`.
 - `build_fig5_category.py` — builds Fig. 5 (per-category recall, all four
   methods) from `results.csv`.
-- `results.csv` — the n=200 scored dataset used for Fig. 4 and Fig. 5.
+- `results.csv` — the n=200 scored dataset used for Fig. 2, Fig. 4, and Fig. 5.
+- `synonym_results.csv` — per-skill canonical-vs-abbreviation scores (12
+  skills) used for Fig. 3.
 - `charts/` — the four chart images actually embedded in the paper:
-  - `discrimination_comparison.png` — Fig. 2
-  - `synonym_smallmultiples.png` — Fig. 3
+  - `discrimination_comparison_hybrid.png` — Fig. 2
+  - `synonym_smallmultiples_hybrid.png` — Fig. 3
   - `results_metrics_n200_hybrid_FINAL.png` — Fig. 4
   - `results_percategory_hybrid_FINAL.png` — Fig. 5
 
-  Fig. 2 and Fig. 3 come from an earlier evaluation run whose generating
-  script predates this cleanup and isn't part of the current codebase; the
-  images are kept since they're the exact figures published in the paper.
+  All four are fully reproducible from the two CSVs above via the
+  `build_fig*.py` scripts in this folder.
 
 ## Data not tracked in git
 
